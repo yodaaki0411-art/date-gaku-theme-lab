@@ -68,6 +68,8 @@ function userWithinLimit(uid) {
   return true;
 }
 
+app.use(express.static(new URL("./public/", import.meta.url).pathname));
+
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.post("/api/consult", requireUser, async (req, res) => {
   const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
