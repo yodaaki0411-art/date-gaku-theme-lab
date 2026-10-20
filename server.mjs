@@ -49,6 +49,33 @@ const requireUser = async (req, res, next) => {
   }
 };
 
+function extractGeminiAnswer(result) {
+  if (typeof result?.output_text === "string" && result.output_text.trim()) {
+    return result.output_text.trim();
+  }
+
+  // REST API responses contain text in steps[].content[].text.
+  const stepText = Array.isArray(result?.steps)
+    ? result.steps
+        .filter((step) => step?.type === "model_output")
+        .flatMap((step) => Array.isArray(step.content) ? step.content : [])
+        .filter((part) => part?.type === "text" && typeof part.text === "string")
+        .map((part) => part.text)
+        .join("\n")
+        .trim()
+    : "";
+  if (stepText) return stepText;
+
+  // Also accept the legacy REST response shape during API transitions.
+  return Array.isArray(result?.outputs)
+    ? result.outputs
+        .filter((part) => part?.type === "text" && typeof part.text === "string")
+        .map((part) => part.text)
+        .join("\n")
+        .trim()
+    : "";
+}
+
 function userWithinLimit(uid) {
   const now = Date.now();
   requestsThisHour = requestsThisHour.filter((time) => time > now - 60 * 60 * 1000);
@@ -84,6 +111,7 @@ app.post("/api/consult", requireUser, async (req, res) => {
       method: "POST",
       headers: { "x-goog-api-key": process.env.GEMINI_API_KEY, "content-type": "application/json" },
       body: JSON.stringify({ model: process.env.GEMINI_MODEL || "gemini-3.8-flash", store: false, input }),
+      signal: AbortSignal.timeout(90000),
     });
     const result = await upstream.json().catch(() => ({}));
     if (!upstream.ok) {
@@ -91,7 +119,7 @@ app.post("/api/consult", requireUser, async (req, res) => {
       console.error("Gemini API returned status", upstream.status);
       return res.status(502).json({ error: "Geminiから回答を取得できませんでした。時間をおいて再度お試しください。" });
     }
-    const answer = typeof result.output_text === "string" ? result.output_text.trim() : "";
+    const answer = extractGeminiAnswer(result);
     if (!answer) return res.status(502).json({ error: "Geminiから回答を受け取れませんでした。もう一度お試しください。" });
     res.set("Cache-Control", "no-store");
     return res.json({ answer });
