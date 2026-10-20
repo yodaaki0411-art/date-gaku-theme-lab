@@ -1,0 +1,11 @@
+{
+  "name": "date-gaku-theme-lab-render-api",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.mjs" },
+  "dependencies": {
+    "express": "^5.1.0",
+    "firebase-admin": "^13.0.0"
+  }
+}
